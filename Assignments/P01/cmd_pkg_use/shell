@@ -13,6 +13,11 @@ It may give you a little insight into organizing your shell code as well.
 """
 import threading
 import sys
+import platform
+import subprocess
+from cmd_pkg.cmdHistory import history as custom_history
+from cmd_pkg.cmdPwd import pwd as custom_pwd
+from cmd_pkg.cmdLs import ls as custom_ls
 from subprocess import call  # FOR DEMO PURPOSES ONLY!
 
 
@@ -22,18 +27,13 @@ def cat(**kwargs):
     if "params" in kwargs:
         params = kwargs["params"]
     command.extend(params)
-    call(command)
+    call(ls)
+
+
 
 
 def ls(**kwargs):
-    """Directory listing."""
-    command = ["ls"]
-    if "params" in kwargs:
-        params = kwargs["params"]
-    else:
-        params = []
-    command.extend(params)
-    call(command)
+    print("ls(**kwargs)")
 
 
 def pwd(**kwargs):
@@ -49,14 +49,16 @@ def pwd(**kwargs):
 def exit(**kwargs):
     sys.exit()
 
-
+data = []
 class CommandHelper(object):
     def __init__(self):
         self.commands = {}
-        self.commands["ls"] = ls
+        self.commands["ls"] = custom_ls
         self.commands["cat"] = cat
-        self.commands["pwd"] = pwd
+        self.commands["pwd"] = custom_pwd
         self.commands["exit"] = exit
+        self.history = []
+        
 
     def invoke(self, **kwargs):
         if "cmd" in kwargs:
@@ -75,6 +77,8 @@ class CommandHelper(object):
             thread = False
 
         # One way to invoke using dictionary
+        if cmd:
+            self.history.append(cmd)
         if not thread:
             self.commands[cmd](params=params)
         else:
@@ -88,8 +92,13 @@ class CommandHelper(object):
             c.join()
 
     def exists(self, cmd):
-        print(self.commands)
+        
         return cmd in self.commands
+    
+    def print_history(self):
+        self.history.append("history")
+        for i, cmd in enumerate(self.history, start=1):
+            print(f"{i}. {cmd}")
 
 
 if __name__ == "__main__":
@@ -98,6 +107,7 @@ if __name__ == "__main__":
 
     while True:
         # get input from terminal (use input if raw_input doesn't work)
+
         cmd = input("$: ")
 
         # print(type(command_input))
@@ -109,12 +119,13 @@ if __name__ == "__main__":
         # params = command_input[1:]
 
         # pull actual command from list
-        # cmd = command_input[0]
+        # cmd = command_input[0]l
 
         params = []
-
         # if command exists in our shell
-        if ch.exists(cmd):
+        if cmd.strip() == "history":
+            ch.print_history()
+        elif ch.exists(cmd):
             ch.invoke(cmd=cmd, params=params, thread=False)
         else:
             print("Error: command %s doesn't exist." % (cmd))
