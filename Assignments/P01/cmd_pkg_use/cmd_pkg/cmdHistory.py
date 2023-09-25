@@ -9,4 +9,4 @@ def history(**kwargs):
         if(result!=""):
             result+="/n"
         result+=x
-    print(result)
+    return result

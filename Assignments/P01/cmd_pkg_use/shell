@@ -15,22 +15,25 @@ import threading
 import sys
 import platform
 import subprocess
+from cmd_pkg.cmdMkDir import mkdir
+from cmd_pkg.cmdMv import mv
+from cmd_pkg.cmdLess import less
+from cmd_pkg.cmdCd import cd
+from cmd_pkg.cmdGrep import grep
+from cmd_pkg.cmdCp import cp
+from cmd_pkg.cmdWhoami import whoami
+from cmd_pkg.cmdSort import sort 
+from cmd_pkg.cmdHead import head
+from cmd_pkg.cmdTail import tail
+from cmd_pkg.cmdRm_rf import rm_rf
+from cmd_pkg.cmdWc import wc_w
+from cmd_pkg.cmdChmod import chmod
+from cmd_pkg.cmdCat import cat
 from cmd_pkg.cmdHistory import history as custom_history
 from cmd_pkg.cmdPwd import pwd as custom_pwd
 from cmd_pkg.cmdLs import ls as custom_ls
+
 from subprocess import call  # FOR DEMO PURPOSES ONLY!
-
-
-def cat(**kwargs):
-    """Concatenate files and send to std out"""
-    command = ["cat"]
-    if "params" in kwargs:
-        params = kwargs["params"]
-    command.extend(params)
-    call(ls)
-
-
-
 
 def ls(**kwargs):
     print("ls(**kwargs)")
@@ -57,6 +60,19 @@ class CommandHelper(object):
         self.commands["cat"] = cat
         self.commands["pwd"] = custom_pwd
         self.commands["exit"] = exit
+        self.commands["mkdir"] = mkdir
+        self.commands["cd"] = cd
+        self.commands["mv"] = mv
+        self.commands["cp"] = cp
+        self.commands["rm -rf"] = rm_rf
+        self.commands["less"] = less
+        self.commands["wc -w"] = wc_w
+        self.commands["head"] = head
+        self.commands["tail"] = tail
+        self.commands["grep"] = grep
+        self.commands["chmod"] = chmod
+        self.commands["sort"] = sort
+        self.commands["whoami"] = whoami
         self.history = []
         
 
@@ -70,62 +86,148 @@ class CommandHelper(object):
             params = kwargs["params"]
         else:
             params = []
+            
+        if "flags" in kwargs:
+            flags = kwargs["flags"]
+        else:
+            flags = []
 
         if "thread" in kwargs:
             thread = kwargs["thread"]
         else:
             thread = False
-
+        
+        if "stdin" in kwargs:
+            stdin = kwargs["stdin"]
+            for out in stdin:
+                params.append(out)
+            
+        else:
+            thread = False
+            
+        
         # One way to invoke using dictionary
-        if cmd:
-            self.history.append(cmd)
+        
+        self.history.append(cmd)
+        
         if not thread:
-            self.commands[cmd](params=params)
+            return self.commands[cmd](params=params, flags=flags)
         else:
             # Using a thread ****** broken right now *********
             if len(params) > 0:
-                c = threading.Thread(target=self.commands[cmd], args=tuple(kwargs))
+                c = threading.Thread(target=self.commands[cmd], args=params, kwargs={"flags": flags})
             else:
                 c = threading.Thread(target=self.commands[cmd])
-
+                
             c.start()
             c.join()
+            return c
 
     def exists(self, cmd):
         
         return cmd in self.commands
     
+    def addHistory(self, cmd):
+        self.history.append(cmd)
     def print_history(self):
         self.history.append("history")
         for i, cmd in enumerate(self.history, start=1):
             print(f"{i}. {cmd}")
+    
+    def parse_command(self, cmd):
+        parts = cmd.strip().split()
+        cmd_name = parts[0]
+        cmd_params = []
+        cmd_flags = []
+
+        for part in parts[1:]:
+            if part.startswith('-'):
+                # This part is a flag
+                cmd_flags.append(part)
+            else:
+                # This part is a parameter
+                cmd_params.append(part)
+
+        return cmd_name, cmd_params, cmd_flags
+
+    def execute_command(self, cmd_str, thread=False):
+        # Split the input command string by pipes ('|')
+            commands = cmd_str.split('|')
+
+            # Initialize the previous command's output as None
+            prev_output = None
+
+            for cmd in commands:
+                # Parse the command to extract name, parameters, and flags
+                cmd_name, cmd_params, cmd_flags = ch.parse_command(cmd)
+
+                # Check if the command exists
+                if ch.exists(cmd_name):
+                    # If this is the first command, pass the parameters and flags
+                    if prev_output is None:
+                        prev_output = ch.invoke(cmd=cmd_name, params=cmd_params, flags=cmd_flags, thread=False)
+                        print(prev_output)
+                    else:
+                        # Redirect the output of the previous command to the current command
+                        kwargs = {"cmd": cmd_name, "params": cmd_params, "flags": cmd_flags, "thread": False}
+                        kwargs["stdin"] = prev_output
+                        prev_output = ch.invoke(cmd=cmd_name, params=cmd_params, flags=cmd_flags, stdin=prev_output, thread=False)
+                else:
+                    print("Error: Command '{}' doesn't exist.".format(cmd_name))
+                    break
+                
+            return prev_output
 
 
 if __name__ == "__main__":
-
     ch = CommandHelper()
 
     while True:
-        # get input from terminal (use input if raw_input doesn't work)
-
+        # Get input from the terminal
         cmd = input("$: ")
+        ch.addHistory(cmd)
 
-        # print(type(command_input))
-
-        # remove command from params (very over simplified)
-        # command_input = command_input.split()
-
-        # params are all but first position in list
-        # params = command_input[1:]
-
-        # pull actual command from list
-        # cmd = command_input[0]l
+        if cmd.startswith("!"):
+            try:
+                # Extract the command number (x)
+                history_number = int(cmd[1:])
+                if history_number > 0 and history_number <= len(ch.history):
+                    # Get the corresponding command from history
+                    cmd = ch.history[history_number - 1]
+                    print(f"Executing: {cmd}")
+                else:
+                    print("Error: Invalid history number.")
+            except ValueError:
+                print("Error: Invalid history format.")
 
         params = []
-        # if command exists in our shell
-        if cmd.strip() == "history":
-            ch.print_history()
-        elif ch.exists(cmd):
-            ch.invoke(cmd=cmd, params=params, thread=False)
+
+        # Handle command piping
+        if '|' in cmd:
+            print(ch.execute_command(cmd))
         else:
-            print("Error: command %s doesn't exist." % (cmd))
+            # If no piping, execute a single command
+            cmd_name, cmd_params, cmd_flags = ch.parse_command(cmd)
+            if cmd.strip() == "history":
+                ch.print_history()
+            
+            elif ch.exists(cmd_name):
+                # Handle commands with parameters and flags
+                
+                if cmd_name == "cd":
+                    # Handle flags and parameters for the 'cd' command
+                    directory = cmd_params[0] if cmd_params else "~"
+                    if "-l" in cmd_flags:
+                        # Handle the '-l' flag
+                        print(f"Changing directory to {directory} (with -l flag)")
+                    else:
+                        print(f"Changing directory to {directory}")
+                    # Execute the 'cd' command
+                    print(ch.invoke(cmd=cmd_name, params=[directory], thread=False))
+                # ... (other commands with parameters and flags)
+                else:
+                    print(ch.invoke(cmd=cmd_name, params=cmd_params, flags=cmd_flags, thread=False)) 
+            else:
+                print("Error: command %s doesn't exist." % (cmd))
+
+
