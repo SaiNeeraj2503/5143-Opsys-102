@@ -20,7 +20,8 @@ def less(**kwargs):
                         user_input = input("\nPress 'q' to quit, 'n' for the next page: ")
 
                         if user_input == 'q':
-                            break
+                            
+                            return "bye"
                         elif user_input == 'n':
                             start_line += page_size
                         else:

@@ -5,10 +5,14 @@ def tail(**kwargs):
         flags = kwargs["flags"]
         if "-n" in flags:
             try:
-                #n_index = params.index("-n")
-                n = int(params[0])
-                file_names = params[1:]
-
+                if ".txt" in params[0]:
+                    length =len(params)
+                    n = int(params[length-1])
+                    file_names = params[:length-1]
+                else:
+                    n = int(params[0])
+                    file_names = params[1:]
+                    
                 for file_name in file_names:
                     lis =[]
                     try:
@@ -21,7 +25,7 @@ def tail(**kwargs):
                     except Exception as e:
                         lis.append(f"Error reading {file_name}: {str(e)}")
                     return '\n'.join(lis)
-            except (ValueError, IndexError):
+            except Exception as e :
                 return "Usage: tail -n [number] [file1] [file2] ..."
         else:
             return "Usage: tail -n [number] [file1] [file2] ..."

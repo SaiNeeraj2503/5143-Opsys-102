@@ -25,8 +25,8 @@ from cmd_pkg.cmdWhoami import whoami
 from cmd_pkg.cmdSort import sort 
 from cmd_pkg.cmdHead import head
 from cmd_pkg.cmdTail import tail
-from cmd_pkg.cmdRm_rf import rm_rf
-from cmd_pkg.cmdWc import wc_w
+from cmd_pkg.cmdRm_rf import rm
+from cmd_pkg.cmdWc import wc
 from cmd_pkg.cmdChmod import chmod
 from cmd_pkg.cmdCat import cat
 from cmd_pkg.cmdHistory import history as custom_history
@@ -35,18 +35,7 @@ from cmd_pkg.cmdLs import ls as custom_ls
 
 from subprocess import call  # FOR DEMO PURPOSES ONLY!
 
-def ls(**kwargs):
-    print("ls(**kwargs)")
 
-
-def pwd(**kwargs):
-    command = ["pwd"]
-    if "params" in kwargs:
-        params = kwargs["params"]
-    else:
-        params = []
-    command.extend(params)
-    call(command)
 
 
 def exit(**kwargs):
@@ -64,9 +53,9 @@ class CommandHelper(object):
         self.commands["cd"] = cd
         self.commands["mv"] = mv
         self.commands["cp"] = cp
-        self.commands["rm -rf"] = rm_rf
+        self.commands["rm"] = rm
         self.commands["less"] = less
-        self.commands["wc -w"] = wc_w
+        self.commands["wc"] = wc
         self.commands["head"] = head
         self.commands["tail"] = tail
         self.commands["grep"] = grep
@@ -75,7 +64,6 @@ class CommandHelper(object):
         self.commands["whoami"] = whoami
         self.history = []
         
-
     def invoke(self, **kwargs):
         if "cmd" in kwargs:
             cmd = kwargs["cmd"]
@@ -130,7 +118,7 @@ class CommandHelper(object):
     def addHistory(self, cmd):
         self.history.append(cmd)
     def print_history(self):
-        self.history.append("history")
+        
         for i, cmd in enumerate(self.history, start=1):
             print(f"{i}. {cmd}")
     
@@ -150,7 +138,7 @@ class CommandHelper(object):
 
         return cmd_name, cmd_params, cmd_flags
 
-    def execute_command(self, cmd_str, thread=False):
+    def execute_command(self, cmd_str, thread=False, output_file=None):
         # Split the input command string by pipes ('|')
             commands = cmd_str.split('|')
 
@@ -166,7 +154,7 @@ class CommandHelper(object):
                     # If this is the first command, pass the parameters and flags
                     if prev_output is None:
                         prev_output = ch.invoke(cmd=cmd_name, params=cmd_params, flags=cmd_flags, thread=False)
-                        print(prev_output)
+                        
                     else:
                         # Redirect the output of the previous command to the current command
                         kwargs = {"cmd": cmd_name, "params": cmd_params, "flags": cmd_flags, "thread": False}
@@ -176,6 +164,17 @@ class CommandHelper(object):
                     print("Error: Command '{}' doesn't exist.".format(cmd_name))
                     break
                 
+            if output_file:
+                with open(output_file, "w") as file:
+                    if type(prev_output) is list:
+                        str = '\n'.join(prev_output)
+                        file.write(str)
+                    else:
+                        file.write(prev_output)
+                        
+            if type(prev_output) is list:
+                return " ".join(prev_output)
+
             return prev_output
 
 
@@ -201,33 +200,49 @@ if __name__ == "__main__":
                 print("Error: Invalid history format.")
 
         params = []
+        
+        if '>' in cmd:
+            cmd_parts = cmd.split('>')
+            cmd = cmd_parts[0].strip()
+            output_file = cmd_parts[1].strip()
+            print(f"Redirecting output to: {output_file}")
+            print(ch.execute_command(cmd, output_file=output_file))
 
         # Handle command piping
-        if '|' in cmd:
-            print(ch.execute_command(cmd))
         else:
-            # If no piping, execute a single command
-            cmd_name, cmd_params, cmd_flags = ch.parse_command(cmd)
-            if cmd.strip() == "history":
-                ch.print_history()
-            
-            elif ch.exists(cmd_name):
-                # Handle commands with parameters and flags
-                
-                if cmd_name == "cd":
-                    # Handle flags and parameters for the 'cd' command
-                    directory = cmd_params[0] if cmd_params else "~"
-                    if "-l" in cmd_flags:
-                        # Handle the '-l' flag
-                        print(f"Changing directory to {directory} (with -l flag)")
-                    else:
-                        print(f"Changing directory to {directory}")
-                    # Execute the 'cd' command
-                    print(ch.invoke(cmd=cmd_name, params=[directory], thread=False))
-                # ... (other commands with parameters and flags)
-                else:
-                    print(ch.invoke(cmd=cmd_name, params=cmd_params, flags=cmd_flags, thread=False)) 
+            if '|' in cmd:
+                print(ch.execute_command(cmd))
             else:
-                print("Error: command %s doesn't exist." % (cmd))
+                # If no piping, execute a single command
+                cmd_name, cmd_params, cmd_flags = ch.parse_command(cmd)
+                if cmd.strip() == "history":
+                    ch.print_history()
+                
+                elif ch.exists(cmd_name):
+                    # Handle commands with parameters and flags
+                    
+                    # if cmd_name == "cd":
+                    #     # Handle flags and parameters for the 'cd' command
+                    #     directory = cmd_params[0] if cmd_params else "~"
+                    #     if "-l" in cmd_flags:
+                    #         # Handle the '-l' flag
+                    #         print(f"Changing directory to {directory} (with -l flag)")
+                    #     else:
+                    #         print(f"Changing directory to {directory}")
+                    #     # Execute the 'cd' command
+                    #     output=(ch.invoke(cmd=cmd_name, params=[directory], thread=False))
+                    #     if type(output) is list:
+                    #         print(" ".join(output))
+                    #     else:
+                    #         print(output)
+                    # # ... (other commands with parameters and flags)
+                    # else:
+                    output=(ch.invoke(cmd=cmd_name, params=cmd_params, flags=cmd_flags, thread=False))
+                    if type(output) is list:
+                        print(" ".join(output))
+                    else:
+                        print(output)
+                else:
+                    print("Error: command %s doesn't exist." % (cmd))
 
 
