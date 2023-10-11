@@ -15,6 +15,7 @@ import threading
 import sys
 import platform
 import subprocess
+import readline
 from cmd_pkg.cmdMkDir import mkdir
 from cmd_pkg.cmdMv import mv
 from cmd_pkg.cmdLess import less
@@ -32,7 +33,7 @@ from cmd_pkg.cmdCat import cat
 from cmd_pkg.cmdHistory import history as custom_history
 from cmd_pkg.cmdPwd import pwd as custom_pwd
 from cmd_pkg.cmdLs import ls as custom_ls
-
+import signal
 from subprocess import call  # FOR DEMO PURPOSES ONLY!
 
 
@@ -63,6 +64,10 @@ class CommandHelper(object):
         self.commands["sort"] = sort
         self.commands["whoami"] = whoami
         self.history = []
+        signal.signal(signal.SIGINT, self.handle_ctrl_c)
+        
+    def handle_ctrl_c(self, signum, frame):
+        sys.exit()
         
     def invoke(self, **kwargs):
         if "cmd" in kwargs:
@@ -87,8 +92,14 @@ class CommandHelper(object):
         
         if "stdin" in kwargs:
             stdin = kwargs["stdin"]
-            for out in stdin:
-                params.append(out)
+            if type(stdin) is not list:
+                files =stdin.split(" ")
+                for file in files:
+                    params.append(file)
+            else:
+                for out in stdin:
+                  params.append(out)
+            
             
         else:
             thread = False
@@ -115,28 +126,68 @@ class CommandHelper(object):
         
         return cmd in self.commands
     
-    def addHistory(self, cmd):
-        self.history.append(cmd)
-    def print_history(self):
+    def addHistory(self, cmd, length):
         
-        for i, cmd in enumerate(self.history, start=1):
-            print(f"{i}. {cmd}")
+        file_object = open(r'/mnt/c/Users/User/Desktop/opsys/History.txt', 'a')
+        if  length-1> 0 :
+            file_object.write("\n")
+        
+        file_object.write(f"{length}. {cmd}")
+        
+    def print_history(self):
+        return (tail(params=[r'/mnt/c/Users/User/Desktop/opsys/History.txt', "10"], flags=["-n"]))
+        
+    
+    # def parse_command(self, cmd):
+    #     parts = cmd.strip().split()
+    #     cmd_name = parts[0]
+    #     cmd_params = []
+    #     cmd_flags = []
+        
+    #     for part in parts[1:]:
+            
+    #         if part.startswith('-'):
+    #             # This part is a flag
+    #             cmd_flags.append(part)
+    #         else:
+                
+    #             # This part is a parameter
+    #             cmd_params.append(part)
+
+    #     return cmd_name, cmd_params, cmd_flags
     
     def parse_command(self, cmd):
         parts = cmd.strip().split()
         cmd_name = parts[0]
         cmd_params = []
         cmd_flags = []
+        in_quotes = False  # Variable to track if we are inside double quotes
 
         for part in parts[1:]:
             if part.startswith('-'):
                 # This part is a flag
                 cmd_flags.append(part)
             else:
-                # This part is a parameter
-                cmd_params.append(part)
+                if part.startswith('"'):
+                    # Start of double-quoted parameter
+                    in_quotes = True
+                    param = part[1:]  # Remove the opening double quote
+                elif part.endswith('"'):
+                    # End of double-quoted parameter
+                    param = part[:-1]  # Remove the closing double quote
+                    in_quotes = False
+                elif in_quotes:
+                    # Inside double quotes, add to the current parameter
+                    param += " " + part
+                else:
+                    # Normal parameter outside of quotes
+                    param = part
+
+                cmd_params.append(param)
 
         return cmd_name, cmd_params, cmd_flags
+
+
 
     def execute_command(self, cmd_str, thread=False, output_file=None):
         # Split the input command string by pipes ('|')
@@ -150,19 +201,23 @@ class CommandHelper(object):
                 cmd_name, cmd_params, cmd_flags = ch.parse_command(cmd)
 
                 # Check if the command exists
-                if ch.exists(cmd_name):
-                    # If this is the first command, pass the parameters and flags
-                    if prev_output is None:
-                        prev_output = ch.invoke(cmd=cmd_name, params=cmd_params, flags=cmd_flags, thread=False)
-                        
-                    else:
-                        # Redirect the output of the previous command to the current command
-                        kwargs = {"cmd": cmd_name, "params": cmd_params, "flags": cmd_flags, "thread": False}
-                        kwargs["stdin"] = prev_output
-                        prev_output = ch.invoke(cmd=cmd_name, params=cmd_params, flags=cmd_flags, stdin=prev_output, thread=False)
+                if cmd.strip() == "history":
+                    prev_output = "/mnt/c/Users/User/Desktop/opsys/History.txt"
                 else:
-                    print("Error: Command '{}' doesn't exist.".format(cmd_name))
-                    break
+                    if ch.exists(cmd_name):
+                        # If this is the first command, pass the parameters and flags
+                        if prev_output is None:
+                            prev_output = ch.invoke(cmd=cmd_name, params=cmd_params, flags=cmd_flags, thread=False)
+                            
+                        else:
+                            # Redirect the output of the previous command to the current command
+                            kwargs = {"cmd": cmd_name, "params": cmd_params, "flags": cmd_flags, "thread": False}
+                            kwargs["stdin"] = prev_output
+                            
+                            prev_output = ch.invoke(cmd=cmd_name, params=cmd_params, flags=cmd_flags, stdin=prev_output, thread=False)
+                    else:
+                        print("Error: Command '{}' doesn't exist.".format(cmd_name))
+                        break
                 
             if output_file:
                 with open(output_file, "w") as file:
@@ -184,15 +239,27 @@ if __name__ == "__main__":
     while True:
         # Get input from the terminal
         cmd = input("$: ")
-        ch.addHistory(cmd)
+        readline.add_history(cmd)
+        x=(wc(params=[r"/mnt/c/Users/User/Desktop/opsys/History.txt"], flags=["-l"])).split(":")
+        
+        length= (int)(x[1].strip())
+        ch.addHistory(cmd, length+1)
 
         if cmd.startswith("!"):
             try:
                 # Extract the command number (x)
                 history_number = int(cmd[1:])
-                if history_number > 0 and history_number <= len(ch.history):
+                
+                if history_number > 0 and history_number <= length+1:
                     # Get the corresponding command from history
-                    cmd = ch.history[history_number - 1]
+                    with open(r"/mnt/c/Users/User/Desktop/opsys/History.txt", 'r') as file:
+                      # Split on spaces only
+                    
+                        lines = file.readlines()
+                        line = lines[history_number - 1]
+                        str =line.split(".")
+                        cmd=str[1].strip()
+                    
                     print(f"Executing: {cmd}")
                 else:
                     print("Error: Invalid history number.")
@@ -216,7 +283,7 @@ if __name__ == "__main__":
                 # If no piping, execute a single command
                 cmd_name, cmd_params, cmd_flags = ch.parse_command(cmd)
                 if cmd.strip() == "history":
-                    ch.print_history()
+                    print(ch.print_history())
                 
                 elif ch.exists(cmd_name):
                     # Handle commands with parameters and flags

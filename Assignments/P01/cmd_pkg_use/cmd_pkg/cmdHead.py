@@ -4,6 +4,20 @@ def head(**kwargs):
         params = kwargs["params"]
         
         flags = kwargs["flags"]
+        if "--help" in flags:
+            help_message = """
+            head - Display the beginning of a file
+            
+            Usage: head [OPTIONS] [FILE]
+            
+            Options:
+              --help     Display this help message and exit.
+              -n NUM     Display the first NUM lines (default is 10).
+            
+            Examples:
+              
+              head -n 20 file.txt   # Display the first 20 lines
+            """
         if "-n" in flags:
             try:
                 if ".txt" in params[0]:

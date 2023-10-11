@@ -95,7 +95,7 @@ if __name__ == '__main__':
                 # get the PREVIOUS command from your history (if there is one)
                 # prints out 'up' then erases it (just to show something)
                 cmd += u"\u2191"
-                print_cmd(cmd)
+                print_cmd("hello")
                 sleep(0.3)
                 #cmd = cmd[:-1]
                 

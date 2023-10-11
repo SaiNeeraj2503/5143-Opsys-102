@@ -2,6 +2,20 @@ import os
 def chmod(**kwargs):
     if "params" in kwargs:
         params = kwargs["params"]
+        if "--help" in params:
+            help_message = """
+            chmod - Change file permissions
+            
+            Usage: chmod [OPTIONS] MODE FILE
+            
+            Options:
+              --help     Display this help message and exit.
+            
+            Examples:
+              chmod 755 myfile.txt   # Change permissions of myfile.txt to 755
+              
+            """
+            return help_message
         if len(params) != 2:
             return "Usage: chmod <permissions> <filename>"
         else:

@@ -3,6 +3,21 @@ def tail(**kwargs):
     if "params" in kwargs:
         params = kwargs["params"]
         flags = kwargs["flags"]
+        if "--help" in flags:
+            help_message = """
+            tail - Display the end of a file
+            
+            Usage: tail [OPTIONS] [FILE]
+            
+            Options:
+              --help     Display this help message and exit.
+              -n NUM     Display the last NUM lines (default is 10).
+            
+            Examples:
+              
+              tail -n 20 file.txt   # Display the last 20 lines
+            """
+            return help_message
         if "-n" in flags:
             try:
                 if ".txt" in params[0]:

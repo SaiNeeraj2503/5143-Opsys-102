@@ -1,11 +1,25 @@
 def less(**kwargs):
     if "params" in kwargs:
         params = kwargs["params"]
+        flags = kwargs["flags"]
+        if "--help" in flags:
+            help_message = """
+            less - Display text files with paging
+            
+            Usage: less [OPTIONS] [FILE]
+            
+            Options:
+              --help     Display this help message and exit.
+            
+            Examples:
+              less file.txt         # Display the contents of file.txt
+            """
+            return help_message
         for file_name in params:
             try:
                 with open(file_name, 'r') as file:
                     lines = file.readlines()
-                    page_size = 20  # Number of lines to display at a time
+                    page_size = 10  # Number of lines to display at a time
                     start_line = 0
 
                     while start_line < len(lines):
@@ -16,9 +30,9 @@ def less(**kwargs):
                         for line in page:
                             output += line
                         print(output)
-
+                        
                         user_input = input("\nPress 'q' to quit, 'n' for the next page: ")
-
+                        
                         if user_input == 'q':
                             
                             return "bye"

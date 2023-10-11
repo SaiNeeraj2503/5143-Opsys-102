@@ -3,6 +3,21 @@ import shutil
 def cp(**kwargs):
     if "params" in kwargs:
         params = kwargs["params"]
+        flags = kwargs["flags"]
+        if "--help" in flags:
+            help_message = """
+            cp - Copy files and directories
+            
+            Usage: cp [OPTIONS] SOURCE DEST
+            
+            Options:
+              --help     Display this help message and exit.
+            
+            Examples:
+              cp file.txt newfile.txt       # Copy file.txt to newfile.txt
+              
+            """
+            return help_message
         if len(params) == 2:
             source = params[0]
             destination = params[1]
