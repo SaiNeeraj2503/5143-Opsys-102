@@ -17,16 +17,20 @@ class FileSystem:
         columns = ["id INTEGER PRIMARY KEY", "pid INTEGER NOT NULL", "filename TEXT NOT NULL", "created_date TEXT NOT NULL", "modified_date TEXT NOT NULL", "size REAL NOT NULL","type TEXT NOT NULL","owner TEXT NOT NULL","groop TEXT NOT NULL","permissions TEXT NOT NULL", "content BLOB"]
 
         data = [
-        (1, 0, 'Folder1', str(datetime.datetime.now()), str(datetime.datetime.now()), 0.0, 'folder', 'user1', 'group1', 'rwxr-xr-x', None),
-        (2, 1, 'File1.txt', str(datetime.datetime.now()), str(datetime.datetime.now()), 1024.5, 'file', 'user1', 'group1', 'rw-r--r--', None),
-        (3, 1, 'File2.txt', str(datetime.datetime.now()), str(datetime.datetime.now()), 512.0, 'file', 'user2', 'group2', 'rw-rw-r--', None),
-        (4, 0, 'Folder2', str(datetime.datetime.now()), str(datetime.datetime.now()), 0.0, 'folder', 'user2', 'group2', 'rwxr-xr--', None),
-        (5, 4, 'File3.txt', str(datetime.datetime.now()), str(datetime.datetime.now()), 2048.75, 'file', 'user3', 'group3', 'rw-r--r--', None),
-        (6, 4, 'File4.txt', str(datetime.datetime.now()), str(datetime.datetime.now()), 4096.0, 'file', 'user3', 'group3', 'rw-r--r--', None),
-        (7, 0, 'Folder3', str(datetime.datetime.now()), str(datetime.datetime.now()), 0.0, 'folder', 'user4', 'group4', 'rwxr-x---', None),
-        (8, 7, 'File5.txt', str(datetime.datetime.now()), str(datetime.datetime.now()), 8192.0, 'file', 'user4', 'group4', 'rw-------', None),
-        (9, 0, 'Folder4', str(datetime.datetime.now()), str(datetime.datetime.now()), 0.0, 'folder', 'user5', 'group5', 'rwxr-xr-x', None),
-        (10, 9, 'File6.txt', str(datetime.datetime.now()), str(datetime.datetime.now()), 3072.25, 'file', 'user5', 'group5', 'rwxr-xr--', None)]
+        (1, 0, 'Folder1', str(datetime.datetime.now()), str(datetime.datetime.now()), 0.0, 'folder', 'user1', 'group1', 'drwxr-xr-x', None),
+        (2, 1, 'File1.txt', str(datetime.datetime.now()), str(datetime.datetime.now()), 1024.5, 'file', 'user1', 'group1', '-rw-r--r--', None),
+        (3, 1, 'File2.txt', str(datetime.datetime.now()), str(datetime.datetime.now()), 512.0, 'file', 'user2', 'group2', '-rw-rw-r--', None),
+        (4, 0, 'Folder2', str(datetime.datetime.now()), str(datetime.datetime.now()), 0.0, 'folder', 'user2', 'group2', 'drwxr-xr--', None),
+        (5, 4, 'File3.txt', str(datetime.datetime.now()), str(datetime.datetime.now()), 2048.75, 'file', 'user3', 'group3', '-rw-r--r--', None),
+        (6, 4, 'File4.txt', str(datetime.datetime.now()), str(datetime.datetime.now()), 4096.0, 'file', 'user3', 'group3', '-rw-r--r--', None),
+        (7, 0, 'Folder3', str(datetime.datetime.now()), str(datetime.datetime.now()), 0.0, 'folder', 'user4', 'group4', 'drwxr-x---', None),
+        (8, 7, 'File5.txt', str(datetime.datetime.now()), str(datetime.datetime.now()), 8192.0, 'file', 'user4', 'group4', '-rw-------', None),
+        (9, 0, 'Folder4', str(datetime.datetime.now()), str(datetime.datetime.now()), 0.0, 'folder', 'user5', 'group5', 'drwxr-xr-x', None),
+        (10, 9, 'File6.txt', str(datetime.datetime.now()), str(datetime.datetime.now()), 3072.25, 'file', 'user5', 'group5', '-rwxr-xr--', None),
+        (11, 0, 'Sample1.txt', str(datetime.datetime.now()), str(datetime.datetime.now()), 3072.25, 'file', 'user5', 'group5', '-rwxr-xr--', None),
+        (12, 0, '.a.txt', str(datetime.datetime.now()), str(datetime.datetime.now()), 5072.25, 'file', 'user5', 'group5', '-rwxr-xr--', None)
+        ]
+
         
         self.crud.drop_table(table_name)
         self.crud.create_table(table_name, columns)
@@ -89,17 +93,21 @@ class FileSystem:
                 if content_type == 'file':
                     # Delete file
                     self.crud.cursor.execute("DELETE FROM files_data WHERE id = ?", (content_id,))
+                    self.crud.conn.commit()
+
                 elif content_type == 'folder':
                     # Recursively delete subdirectory
                     self.delete_directory(content_id)
 
             # Delete the directory itself
             self.crud.cursor.execute("DELETE FROM files_data WHERE id = ?", (directory_id,))
+            self.crud.conn.commit()
+
             return "Directory or file deleted successfully."
         else:
             return "Directory not found."
 
-    def convert_permission(self, triple):
+    def convert_permission(self, triple,folder):
         """
         Convert a triple of numbers (e.g., 644) into the 'rwx' equivalent (e.g., 'rw-r--r--').
         
@@ -116,8 +124,10 @@ class FileSystem:
         owner = self.convert_digit(triple // 100)
         group = self.convert_digit((triple // 10) % 10)
         others = self.convert_digit(triple % 10)
-
-        return owner + group + others
+        p=owner + group + others
+        if folder:
+           return "d"+ p
+        return "-"+p
 
     def convert_digit(self, digit):
         """
@@ -155,10 +165,13 @@ class FileSystem:
         cols = ["Filename", "Owner", "Permissions", "Size"]
         query = f"SELECT filename, owner, permissions, size, type FROM files_data WHERE pid = {self.cwdid} AND filename NOT LIKE '.%';"
         if long:
-            query = f"SELECT filename, created_date, modified_date, size, type, owner, groop, permissions FROM files_data WHERE pid = {self.cwdid} AND filename NOT LIKE '.%';"
+            if all:
+                query = f"SELECT filename, created_date, modified_date, size, type, owner, groop, permissions FROM files_data WHERE pid = {self.cwdid};"
+            else:
+                query = f"SELECT filename, created_date, modified_date, size, type, owner, groop, permissions FROM files_data WHERE pid = {self.cwdid} AND filename NOT LIKE '.%';"
             cols = ["Filename", "Created", "Modified", "Size", "Type", "Owner", "Group", "Permissions"]
-        if all:
-            query.replace("AND filename NOT LIKE '.%'","")
+        # if all:
+        #     query.replace("AND filename LIKE '.%'","")
               
         self.crud.cursor.execute(query)
         results = self.crud.cursor.fetchall()
@@ -183,8 +196,9 @@ class FileSystem:
         """
         name = kwargs.get('name', None)
         if name:
-            query = f"INSERT INTO files_data (pid, filename, created_date, modified_date, size, type, owner, groop, permissions) VALUES ({self.cwdid}, '{name}', '{datetime.datetime.now()}', '{datetime.datetime.now()}', 0.0, 'folder', 'user1', 'group1', 'rw-r--r--');"
+            query = f"INSERT INTO files_data (pid, filename, created_date, modified_date, size, type, owner, groop, permissions) VALUES ({self.cwdid}, '{name}', '{datetime.datetime.now()}', '{datetime.datetime.now()}', 0.0, 'folder', 'user1', 'group1', 'drw-r--r--');"
             self.crud.cursor.execute(query)
+            self.crud.conn.commit()
             return f"Created directory '{name}'"
         else:
             return "mkdir: missing directory name"
@@ -234,6 +248,8 @@ class FileSystem:
             if source_id and destination_id:
                 query = f"UPDATE files_data SET pid = {destination_id} WHERE id = {source_id};"
                 self.crud.cursor.execute(query)
+                self.crud.conn.commit()
+
                 return f"Moved '{source}' to '{destination}'"
             else:
                 return f"mv: No such file or directory. Please check file or folder paths"
@@ -266,6 +282,8 @@ class FileSystem:
                     result = self.crud.cursor.fetchone()
                     query = f"INSERT INTO files_data (pid, filename, created_date, modified_date, size, type, owner, groop, permissions, content) VALUES ({destination_id}, '{result[2]}', '{str(datetime.datetime.now())}', '{str(datetime.datetime.now())}', {result[5]}, '{result[6]}', '{result[7]}', '{result[8]}', '{result[9]}', '{result[10]}');"
                     self.crud.cursor.execute(query)
+                    self.crud.conn.commit()
+
                     
                     # get the id and filename of copied item
                     query = f"SELECT id, filename FROM files_data WHERE pid = {destination_id} AND filename = '{result[2]}';"
@@ -286,6 +304,8 @@ class FileSystem:
                             else:
                                 query = f"INSERT INTO files_data (pid, filename, created_date, modified_date, size, type, owner, groop, permissions, content) VALUES ({inserted_id}, '{row[2]}', '{str(datetime.datetime.now())}', '{str(datetime.datetime.now())}', {row[5]}, '{row[6]}', '{row[7]}', '{row[8]}', '{row[9]}', '{row[10]}');"
                                 self.crud.cursor.execute(query)
+                                self.crud.conn.commit()
+
 
                     return f"Copied '{source}' to '{destination}'"
         else:
@@ -327,11 +347,17 @@ class FileSystem:
             return "chmod: missing operand"
 
         id = self.__getFileId(name=name)
+        query = "SELECT type FROM files_data WHERE id = ?;"
+        self.crud.cursor.execute(query, (id,))
+        result = self.crud.cursor.fetchone()
+        folder=False
+        if result[0]=="folder":
+            folder=True
         if not id:
             return "chmod: cannot access file or folder: No such file or directory"
 
         if permission.isdigit():
-            permission = self.convert_permission(int(permission))
+            permission = self.convert_permission(int(permission),folder)
         else:
             current_permissions = self.get_current_permissions(id)
             updated_permissions = self.__process_permission_change(permission, current_permissions)
@@ -342,6 +368,8 @@ class FileSystem:
 
         query = f"UPDATE files_data SET permissions = '{permission}' WHERE id = {id};"
         self.crud.cursor.execute(query)
+        self.crud.conn.commit()
+
         
         return "Permissions updated successfully."
 
@@ -374,23 +402,6 @@ class FileSystem:
             return None
         return current_permissions
 
-    def chgrp(self, **kwargs):
-        """change group of file or directory
-        """
-        group = kwargs.get('group', None)
-        name = kwargs.get('name', None)
-
-        if (not group) or (not name):
-            return "chgrp: group name or file name not provided"
-
-        file_id = self.__getFileId(name=name)
-
-        if not file_id:
-            return "chgrp: cannot access file or folder: No such file or directory"
-        # update group and modified date
-        query = f"UPDATE files_data SET groop = '{group}', modified_date = '{str(datetime.datetime.now())}' WHERE id = {file_id};"
-        self.crud.cursor.execute(query)
-        return "Group updated successfully."
 
     def touch(self, **kwargs):
         """ Create a new file from system directory if not found create an empty file
@@ -414,8 +425,9 @@ class FileSystem:
                 file_size = len(file_content)
 
             query = "INSERT INTO files_data (pid, filename, created_date, modified_date, size, type, owner, groop, permissions, content) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"
-            data = (self.cwdid, name.split('/')[-1], datetime.datetime.now(), datetime.datetime.now(), file_size, 'file', 'user1', 'group1', 'rw-r--r--', file_content)
+            data = (self.cwdid, name.split('/')[-1], datetime.datetime.now(), datetime.datetime.now(), file_size, 'file', 'user1', 'group1', '-rw-r--r--', file_content)
             self.crud.cursor.execute(query, data)
+            self.crud.conn.commit()
             return f"Created file '{name}'"
 
         else:
@@ -426,3 +438,6 @@ class FileSystem:
     
     def get_history(self):
         return "\n".join(self.history)
+    
+ 
+        
